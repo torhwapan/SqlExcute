@@ -45,7 +45,12 @@ namespace WpfApp1
             ExecuteBtn.IsEnabled = false;
             if (!IsSafeSql(sql, out string errorMsg))
             {
-                MessageBox.Show(errorMsg, "SQL防呆校验失败", MessageBoxButton.OK, MessageBoxImage.Error);
+                // 只有当errorMsg不为空时才显示错误消息框
+                // 这样可以避免在用户选择"否"时不显示额外的错误消息
+                if (!string.IsNullOrEmpty(errorMsg))
+                {
+                    MessageBox.Show(errorMsg, "SQL防呆校验失败", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
                 ResultGrid.ItemsSource = null;
                 SqlInput.IsReadOnly = false;
                 return;
@@ -290,7 +295,7 @@ namespace WpfApp1
             string[] dangerWords = { "drop", "truncate", "alter", "exec", "execute", "merge", "call", "grant", "revoke", "backup", "restore", "replace", "union", "intersect", "minus", "load", "outfile", "dual" };
             foreach (var word in dangerWords)
             {
-                if (Regex.IsMatch(sql, $@"\\b{word}\\b", RegexOptions.IgnoreCase))
+                if (Regex.IsMatch(sql, $@"\b{word}\b", RegexOptions.IgnoreCase))
                 {
                     errorMsg = $"SQL中包含非法关键字：{word}";
                     return false;
@@ -302,11 +307,17 @@ namespace WpfApp1
                 errorMsg = "SQL中包含注释符号";
                 return false;
             }
-            // 禁止拼接变量
+            // 禁止拼接变量（让用户选择是否继续）
             if (Regex.IsMatch(sql, @"[@#:][\w]+|\$\{[\w]+\}", RegexOptions.IgnoreCase))
             {
                 errorMsg = "SQL中包含变量拼接，存在注入风险";
-                return false;
+                var result = MessageBox.Show(errorMsg + "\n\n是否继续执行？", "SQL安全警告", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+                if (result == MessageBoxResult.No)
+                {
+                    // 用户选择"否"时，清空errorMsg以避免显示额外的错误消息框
+                    errorMsg = "";
+                    return false;
+                }
             }
             
             // 对UPDATE/DELETE的特殊校验
@@ -318,10 +329,32 @@ namespace WpfApp1
                     errorMsg = "UPDATE/DELETE 语句必须包含 WHERE 条件";
                     return false;
                 }
-                // 禁止全表操作
-                if (Regex.IsMatch(sql, @"\bwhere\b\s+1\s*=\s*1|\bor\s+1\s*=\s*1", RegexOptions.IgnoreCase))
+                // 禁止全表操作 - 更智能的检测
+                var whereMatch = Regex.Match(sql, @"\bwhere\b\s+(.+)", RegexOptions.IgnoreCase);
+                if (whereMatch.Success)
                 {
-                    errorMsg = "WHERE条件存在全表操作风险";
+                    string whereClause = whereMatch.Groups[1].Value.Trim();
+                    
+                    // 检查WHERE条件是否为空或只有空格
+                    if (string.IsNullOrEmpty(whereClause))
+                    {
+                        errorMsg = "WHERE条件为空，存在全表操作风险";
+                        return false;
+                    }
+                    
+                    // 检查是否是单纯的1=1，没有其他条件
+                    // 这种情况是危险的：WHERE 1=1
+                    // 但这种情况是安全的：WHERE 1=1 AND user_id=1
+                    if (Regex.IsMatch(whereClause, @"^\s*1\s*=\s*1\s*$", RegexOptions.IgnoreCase))
+                    {
+                        errorMsg = "WHERE条件存在全表操作风险";
+                        return false;
+                    }
+                }
+                else
+                {
+                    // 没有找到WHERE子句（理论上不会发生，因为我们之前已经检查过了）
+                    errorMsg = "UPDATE/DELETE 语句必须包含 WHERE 条件";
                     return false;
                 }
             }
