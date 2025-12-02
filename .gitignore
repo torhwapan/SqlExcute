@@ -1,0 +1,43 @@
+# .NET Core SDK
+**/bin/
+**/obj/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Visual Studio 2015/2017 cache/options
+.vscode/
+*.ntvs*
+*.njsproj
+*.sln
+
+# Rider
+.idea/
+*.csproj.user
+*. Rider
+
+# ReSharper
+_ReSharper*/
+*.[Rr]e[Ss]harper
+*.DotSettings.user
+
+# NuGet
+packages/
+*.nuget.props
+*.nuget.targets
+
+# dotnet cache
+.env
+.env.local
+.env.production.local
+
+# VS for Mac
+*.svcmap
+*.settings
+*.dbmdl
+*.pubxml
+*.publishproj
