@@ -223,14 +223,20 @@ namespace WpfApp1
                     msg = "只允许UPDATE或DELETE语句";
                     return false;
                 }
-                // 提取where条件
-                var whereMatch = Regex.Match(sql, @"where\s+(.+)", RegexOptions.IgnoreCase);
+                // 提取where条件（不包含where关键字本身）
+                var whereMatch = Regex.Match(sql, @"\bwhere\b\s+(.+)", RegexOptions.IgnoreCase);
                 if (!whereMatch.Success)
                 {
                     msg = "必须包含WHERE条件";
                     return false;
                 }
+                // whereClause只包含where后面的条件部分，不包含where关键字
                 whereClause = whereMatch.Groups[1].Value.Trim();
+                // 额外防护：如果whereClause仍然以where开头，去掉它（防止重复）
+                if (whereClause.StartsWith("where ", StringComparison.OrdinalIgnoreCase))
+                {
+                    whereClause = whereClause.Substring(6).Trim();
+                }
                 // 检测复杂where
                 if (whereClause.Contains("(") || whereClause.Contains(" in ") || whereClause.Contains(" exists ") || whereClause.Contains("select ") || whereClause.Contains("SELECT ") || whereClause.Contains(" or ") || whereClause.Contains(" and "))
                 {
@@ -249,9 +255,21 @@ namespace WpfApp1
                 else if (sqlLower.StartsWith("delete "))
                 {
                     // delete from table [alias] where ...
-                    var match = Regex.Match(sql, @"delete\s+from\s+([\w\.]+)(?:\s+\w+)?", RegexOptions.IgnoreCase);
+                    // 修正：使用负向前瞻确保别名部分不会匹配到where关键字
+                    // (?!where\b) 表示后面不能紧跟where关键字
+                    var match = Regex.Match(sql, @"delete\s+from\s+([\w\.]+)(?:\s+(?!where\b)\w+)?\s+where", RegexOptions.IgnoreCase);
                     if (match.Success)
+                    {
                         table = match.Groups[1].Value;
+                    }
+                    else
+                    {
+                        // 后备方案：如果上面没匹配到，使用更简单的正则
+                        // 这种情况理论上不应该发生，但为了健壮性保留
+                        match = Regex.Match(sql, @"delete\s+from\s+([\w\.]+)\s+where", RegexOptions.IgnoreCase);
+                        if (match.Success)
+                            table = match.Groups[1].Value;
+                    }
                 }
                 if (string.IsNullOrEmpty(table))
                 {
