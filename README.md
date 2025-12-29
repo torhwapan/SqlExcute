@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -237,28 +237,28 @@ namespace WpfApp1
                     isComplexWhere = true;
                     msg = "检测到复杂WHERE条件，select语句仅供参考！";
                 }
-                // 提取表名及别名（兼容别名、hint、with、delete from ...等）
-                string tableWithAlias = "";
+                // 提取表名（兼容别名、hint、with、delete from ...等）
+                string table = "";
                 if (sqlLower.StartsWith("update "))
                 {
-                    // update table [alias] set ... - 捕获表名和可选的别名
-                    var match = Regex.Match(sql, @"update\s+([\w\.]+(?:\s+(?!set\b)\w+)?)\s+set", RegexOptions.IgnoreCase);
+                    // update table [alias] set ...
+                    var match = Regex.Match(sql, @"update\s+([\w\.]+)(?:\s+\w+)?\s+set", RegexOptions.IgnoreCase);
                     if (match.Success)
-                        tableWithAlias = match.Groups[1].Value.Trim();
+                        table = match.Groups[1].Value;
                 }
                 else if (sqlLower.StartsWith("delete "))
                 {
-                    // delete from table [alias] where ... - 捕获表名和可选的别名
-                    var match = Regex.Match(sql, @"delete\s+from\s+([\w\.]+(?:\s+(?!where\b)\w+)?)\s+where", RegexOptions.IgnoreCase);
+                    // delete from table [alias] where ...
+                    var match = Regex.Match(sql, @"delete\s+from\s+([\w\.]+)(?:\s+\w+)?", RegexOptions.IgnoreCase);
                     if (match.Success)
-                        tableWithAlias = match.Groups[1].Value.Trim();
+                        table = match.Groups[1].Value;
                 }
-                if (string.IsNullOrEmpty(tableWithAlias))
+                if (string.IsNullOrEmpty(table))
                 {
                     msg = "未能识别表名，无法转换为SELECT语句，请检查SQL格式！";
                     return false;
                 }
-                selectSql = $"select * from {tableWithAlias} where {whereClause}";
+                selectSql = $"select * from {table} where {whereClause}";
                 return true;
             }
             catch (Exception ex)
